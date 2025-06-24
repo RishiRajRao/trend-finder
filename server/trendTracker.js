@@ -174,11 +174,12 @@ class TrendTracker {
         part: 'snippet',
         type: 'video',
         regionCode: 'IN',
+        relevanceLanguage: 'hi', // Prioritize Hindi content
         publishedAfter: twelveHoursAgo, // Only videos from last 12 hours
         order: 'viewCount', // Sort by views for viral content
         videoDuration: 'short', // Only YouTube Shorts (under 60 seconds)
         maxResults: 50, // Get more to filter for viral ones
-        q: 'trending OR viral OR breaking OR latest OR shorts', // Target viral keywords + shorts
+        q: 'breaking news OR latest news OR viral news OR trending news OR india news OR hindi news OR politics OR government OR minister OR parliament OR election OR protest OR scam OR corruption OR arrest OR court OR crime OR police OR market OR stock OR sensex OR nifty OR business OR economy OR budget OR tax OR price OR petrol OR diesel OR gas OR electricity OR salary OR job OR scheme OR yojana OR rbi OR inflation OR ipo OR company OR startup', // General news-focused keywords
       });
 
       if (!response.data.items || response.data.items.length === 0) {
@@ -234,19 +235,352 @@ class TrendTracker {
         };
       });
 
-      // Filter for viral Shorts (lower thresholds since Shorts go viral faster)
-      const viralShorts = videosWithStats.filter(
-        (video) =>
-          video.views >= 5000 || // At least 5K views in 12 hours for Shorts
+      // Check if channel/content is Indian adult news content
+      const isIndianAdultNewsContent = (video) => {
+        const title = video.title.toLowerCase();
+        const channel = video.channel.toLowerCase();
+
+        // Filter out children/family/entertainment content
+        const childrenKeywords = [
+          'kids',
+          'children',
+          'baby',
+          'toddler',
+          'cartoon',
+          'nursery',
+          'rhyme',
+          'family',
+          'mom',
+          'dad',
+          'papa',
+          'mama',
+          'bhai',
+          'sister',
+          'brother',
+          'cute',
+          'funny baby',
+          'child',
+          'bachcha',
+          'बच्चा',
+          'परिवार',
+          'cooking',
+          'recipe',
+          'food',
+          'kitchen',
+          'dance',
+          'music',
+          'song',
+          'comedy',
+          'funny',
+          'entertainment',
+          'vlogs',
+          'lifestyle',
+          'games',
+          'tutorial',
+          'tech review',
+          'unboxing',
+          'reaction',
+          'masti',
+          'mazak',
+          'हंसी',
+          'मजाक',
+          'गाना',
+          'डांस',
+          'खाना',
+          'रेसिपी',
+        ];
+
+        const hasChildrenContent = childrenKeywords.some(
+          (keyword) => title.includes(keyword) || channel.includes(keyword)
+        );
+
+        if (hasChildrenContent) return false; // Exclude children/family content
+
+        // Indian language indicators
+        const hindiPattern = /[\u0900-\u097F]/; // Devanagari script
+        const hasHindi =
+          hindiPattern.test(video.title) || hindiPattern.test(video.channel);
+
+        // News-focused Indian keywords
+        const indianNewsKeywords = [
+          'india',
+          'indian',
+          'hindi',
+          'news',
+          'breaking',
+          'latest',
+          'update',
+          'politics',
+          'government',
+          'minister',
+          'pm modi',
+          'parliament',
+          'election',
+          'court',
+          'supreme court',
+          'high court',
+          'judge',
+          'legal',
+          'law',
+          'police',
+          'crime',
+          'arrest',
+          'investigation',
+          'case',
+          'scam',
+          'corruption',
+          'protest',
+          'rally',
+          'strike',
+          'demonstration',
+          'controversy',
+          'debate',
+          'economy',
+          'market',
+          'stock',
+          'share',
+          'sensex',
+          'nifty',
+          'rupee',
+          'dollar',
+          'budget',
+          'tax',
+          'gst',
+          'income tax',
+          'policy',
+          'rbi',
+          'reserve bank',
+          'inflation',
+          'gdp',
+          'recession',
+          'growth',
+          'investment',
+          'mutual fund',
+          'ipo',
+          'trading',
+          'crypto',
+          'bitcoin',
+          'gold',
+          'silver',
+          'commodity',
+          'banking',
+          'loan',
+          'interest rate',
+          'emi',
+          'credit',
+          'debit',
+          'salary',
+          'pension',
+          'pf',
+          'epf',
+          'insurance',
+          'sip',
+          'fd',
+          'fixed deposit',
+          'business',
+          'company',
+          'startup',
+          'unicorn',
+          'ceo',
+          'chairman',
+          'profit',
+          'loss',
+          'revenue',
+          'merger',
+          'acquisition',
+          'listing',
+          'shares',
+          'adani',
+          'ambani',
+          'tata',
+          'reliance',
+          'infosys',
+          'wipro',
+          'industry',
+          'petrol',
+          'diesel',
+          'lpg',
+          'gas',
+          'electricity',
+          'power',
+          'water',
+          'railway',
+          'train',
+          'metro',
+          'transport',
+          'fuel',
+          'price',
+          'rate',
+          'subsidy',
+          'scheme',
+          'yojana',
+          'benefit',
+          'welfare',
+          'health',
+          'education',
+          'job',
+          'employment',
+          'unemployment',
+          'salary hike',
+          'internet',
+          'mobile',
+          'telecom',
+          'jio',
+          'airtel',
+          'vi',
+          'broadband',
+          'upi',
+          'digital',
+          'online',
+          'app',
+          'technology',
+          'ai',
+          'delhi',
+          'mumbai',
+          'kolkata',
+          'chennai',
+          'bengaluru',
+          'hyderabad',
+          'punjab',
+          'maharashtra',
+          'gujarat',
+          'rajasthan',
+          'up',
+          'bihar',
+          'congress',
+          'bjp',
+          'aap',
+          'tmc',
+          'sp',
+          'bsp',
+          'party',
+          'leader',
+          'viral',
+          'trending',
+          'exposed',
+          'shocking',
+          'exclusive',
+          'reality',
+          'समाचार',
+          'न्यूज़',
+          'राजनीति',
+          'सरकार',
+          'मंत्री',
+          'अदालत',
+          'पुलिस',
+          'बाजार',
+          'शेयर',
+          'पैसा',
+          'रुपया',
+          'व्यापार',
+          'कंपनी',
+          'नौकरी',
+          'रोजगार',
+          'वेतन',
+          'पेट्रोल',
+          'डीजल',
+          'गैस',
+          'बिजली',
+          'पानी',
+          'ट्रेन',
+          'मेट्रो',
+          'स्वास्थ्य',
+          'शिक्षा',
+          'योजना',
+          'सब्सिडी',
+        ];
+
+        const hasNewsKeywords = indianNewsKeywords.some(
+          (keyword) => title.includes(keyword) || channel.includes(keyword)
+        );
+
+        // Indian news channel patterns (including business & finance)
+        const indianNewsChannelPatterns = [
+          'news',
+          'tv',
+          'channel',
+          'media',
+          'press',
+          'times',
+          'today',
+          'live',
+          'update',
+          'bulletin',
+          'report',
+          'journalist',
+          'anchor',
+          'hindi news',
+          'bharat',
+          'hindustan',
+          'aaj tak',
+          'zee news',
+          'ndtv',
+          'republic',
+          'cnbc',
+          'india tv',
+          'abp',
+          'news18',
+          'business',
+          'finance',
+          'money',
+          'market',
+          'stock',
+          'economic',
+          'financial',
+          'business today',
+          'et now',
+          'bloomberg',
+          'moneycontrol',
+          'mint',
+        ];
+
+        const hasNewsChannelPattern = indianNewsChannelPatterns.some(
+          (pattern) => channel.includes(pattern)
+        );
+
+        // Must be Indian AND news-related AND not children content
+        return (
+          (hasHindi || hasNewsKeywords || hasNewsChannelPattern) &&
+          !hasChildrenContent
+        );
+      };
+
+      // Filter for viral Indian adult news Shorts
+      const viralIndianNewsShorts = videosWithStats.filter((video) => {
+        const isViral =
+          video.views >= 3000 || // Lower threshold for news content
           video.title.toLowerCase().includes('viral') ||
           video.title.toLowerCase().includes('trending') ||
           video.title.toLowerCase().includes('breaking') ||
-          video.title.toLowerCase().includes('shorts') ||
-          video.title.toLowerCase().includes('#shorts')
-      );
+          video.title.toLowerCase().includes('news') ||
+          video.title.toLowerCase().includes('exposed') ||
+          video.title.toLowerCase().includes('shocking') ||
+          video.title.toLowerCase().includes('market') ||
+          video.title.toLowerCase().includes('stock') ||
+          video.title.toLowerCase().includes('price') ||
+          video.title.toLowerCase().includes('rate') ||
+          video.title.toLowerCase().includes('budget') ||
+          video.title.toLowerCase().includes('scheme') ||
+          video.title.toLowerCase().includes('yojana') ||
+          video.title.toLowerCase().includes('salary') ||
+          video.title.toLowerCase().includes('job') ||
+          video.title.toLowerCase().includes('petrol') ||
+          video.title.toLowerCase().includes('diesel') ||
+          video.title.toLowerCase().includes('gas') ||
+          video.title.toLowerCase().includes('electricity');
 
-      // Sort by views and return top 10 viral Shorts
-      return viralShorts.sort((a, b) => b.views - a.views).slice(0, 10);
+        const isIndianNews = isIndianAdultNewsContent(video);
+
+        return isViral && isIndianNews; // Must be both viral AND Indian news
+      });
+
+      // Sort by views and return top 10 viral Indian news Shorts
+      console.log(
+        `📰🇮🇳 Found ${viralIndianNewsShorts.length} viral Indian news Shorts from last 12 hours`
+      );
+      return viralIndianNewsShorts
+        .sort((a, b) => b.views - a.views)
+        .slice(0, 10);
     } catch (error) {
       console.error('❌ Error fetching YouTube trends:', error.message);
       return [];
