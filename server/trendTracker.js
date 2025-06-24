@@ -1469,7 +1469,7 @@ class TrendTracker {
     }
   }
 
-  // Scrape Twitter trends from trends24.in
+  // Enhanced scraping with viral content detection
   async scrapeTwitterFromTrends24() {
     try {
       const response = await axios.get('https://trends24.in/india/', {
@@ -1489,52 +1489,237 @@ class TrendTracker {
       const $ = cheerio.load(response.data);
       const trends = [];
 
-      // Try multiple selectors for trend extraction
+      // Enhanced selectors for better trend extraction
       const selectors = [
         '.trend-card__list .trend-card__list-item',
         '.trending-item',
         '.trend-item',
         'a[href*="twitter.com"]',
         '[class*="trend"]',
+        '.hashtag-item',
+        '.trending-topic',
       ];
 
       for (const selector of selectors) {
         $(selector).each((i, element) => {
-          if (trends.length >= 20) return false; // Limit to 20 trends
+          if (trends.length >= 25) return false; // Increased limit for better filtering
 
           const text = $(element).text().trim();
           const href =
             $(element).attr('href') || $(element).find('a').attr('href');
 
-          if (text && text.length > 1 && text.length < 100) {
-            // Clean up the text
-            const cleanText = text.replace(/^\d+\.?\s*/, '').trim(); // Remove numbering
+          if (text && text.length > 1 && text.length < 120) {
+            // Enhanced text cleaning
+            const cleanText = text
+              .replace(/^\d+\.?\s*/, '') // Remove numbering
+              .replace(/\s*tweets.*$/i, '') // Remove tweet count
+              .replace(/\s*K tweets.*$/i, '') // Remove K tweets
+              .replace(/\s*M tweets.*$/i, '') // Remove M tweets
+              .trim();
 
             if (cleanText && !trends.some((t) => t.title === cleanText)) {
-              trends.push({
-                title: cleanText,
-                source: 'trends24.in',
-                url: href || 'https://trends24.in/india/',
-                type: 'hashtag',
-                score: this.scoreTwitterTrend(cleanText),
-                platform: 'Twitter',
-              });
+              const score = this.scoreTwitterTrend(cleanText);
+
+              // Only include trends with decent viral potential
+              if (score >= 5 || this.isViralTwitterContent(cleanText)) {
+                trends.push({
+                  title: cleanText,
+                  source: 'trends24.in',
+                  url:
+                    href ||
+                    `https://twitter.com/search?q=${encodeURIComponent(
+                      cleanText
+                    )}`,
+                  type: this.getTwitterContentType(cleanText),
+                  score: score,
+                  platform: 'Twitter',
+                  category: this.categorizeTwitterTrend(cleanText),
+                });
+              }
             }
           }
         });
 
-        if (trends.length >= 10) break; // Found enough trends
+        if (trends.length >= 15) break; // Found enough quality trends
       }
 
-      console.log(`📱 Found ${trends.length} Twitter trends from trends24.in`);
-      return trends.slice(0, 15); // Return top 15
+      // Sort by score and return top viral trends
+      const sortedTrends = trends
+        .sort((a, b) => b.score - a.score)
+        .slice(0, 15);
+
+      console.log(
+        `📱 Found ${sortedTrends.length} viral Twitter trends from trends24.in`
+      );
+      return sortedTrends;
     } catch (error) {
       console.error('❌ Error scraping trends24.in:', error.message);
       return [];
     }
   }
 
-  // Scrape Twitter trends from getdaytrends.com (fallback)
+  // Enhanced viral content detection
+  isViralTwitterContent(text) {
+    const viralKeywords = [
+      // Breaking news indicators
+      'breaking',
+      'urgent',
+      'alert',
+      'live',
+      'now',
+      'just in',
+      'developing',
+      'बड़ी खबर',
+      'तत्काल',
+      'अभी',
+      'तुरंत',
+      'लाइव',
+
+      // Viral content indicators
+      'viral',
+      'trending',
+      'shocking',
+      'exposed',
+      'scandal',
+      'controversy',
+      'arrest',
+      'raid',
+      'caught',
+      'leaked',
+      'exclusive',
+      'bombshell',
+      'वायरल',
+      'ट्रेंडिंग',
+      'गिरफ्तार',
+      'छापेमारी',
+      'एक्सक्लूसिव',
+
+      // Sensational terms
+      'massive',
+      'huge',
+      'major',
+      'historic',
+      'unprecedented',
+      'dramatic',
+      'explosive',
+      'devastating',
+      'shocking',
+      'stunning',
+      'unbelievable',
+      'बड़ा',
+      'भारी',
+      'ऐतिहासिक',
+      'चौंकाने वाला',
+      'हैरान करने वाला',
+
+      // Indian political/social hot topics
+      'modi',
+      'rahul',
+      'kejriwal',
+      'parliament',
+      'supreme court',
+      'cbi',
+      'ed',
+      'farmer',
+      'protest',
+      'strike',
+      'bandh',
+      'riot',
+      'violence',
+      'मोदी',
+      'राहुल',
+      'केजरीवाल',
+      'संसद',
+      'सुप्रीम कोर्ट',
+      'प्रदर्शन',
+
+      // Crime and justice
+      'murder',
+      'rape',
+      'scam',
+      'corruption',
+      'fraud',
+      'terror',
+      'attack',
+      'हत्या',
+      'बलात्कार',
+      'घोटाला',
+      'भ्रष्टाचार',
+      'आतंक',
+      'हमला',
+
+      // Celebrity/entertainment viral
+      'bollywood',
+      'cricket',
+      'ipl',
+      'wedding',
+      'death',
+      'accident',
+      'बॉलीवुड',
+      'क्रिकेट',
+      'शादी',
+      'मौत',
+      'दुर्घटना',
+    ];
+
+    const lowerText = text.toLowerCase();
+    return viralKeywords.some((keyword) =>
+      lowerText.includes(keyword.toLowerCase())
+    );
+  }
+
+  // Categorize Twitter trends
+  categorizeTwitterTrend(text) {
+    const lowerText = text.toLowerCase();
+
+    if (
+      lowerText.includes('breaking') ||
+      lowerText.includes('बड़ी खबर') ||
+      lowerText.includes('live') ||
+      lowerText.includes('लाइव')
+    ) {
+      return 'Breaking News';
+    }
+
+    if (
+      lowerText.includes('bollywood') ||
+      lowerText.includes('cricket') ||
+      lowerText.includes('बॉलीवुड') ||
+      lowerText.includes('क्रिकेट')
+    ) {
+      return 'Entertainment/Sports';
+    }
+
+    if (
+      lowerText.includes('modi') ||
+      lowerText.includes('parliament') ||
+      lowerText.includes('मोदी') ||
+      lowerText.includes('संसद')
+    ) {
+      return 'Politics';
+    }
+
+    if (
+      lowerText.includes('arrest') ||
+      lowerText.includes('scam') ||
+      lowerText.includes('गिरफ्तार') ||
+      lowerText.includes('घोटाला')
+    ) {
+      return 'Crime/Justice';
+    }
+
+    return 'General';
+  }
+
+  // Get Twitter content type
+  getTwitterContentType(text) {
+    if (text.startsWith('#')) return 'hashtag';
+    if (text.startsWith('@')) return 'mention';
+    if (this.isViralTwitterContent(text)) return 'viral_topic';
+    return 'trending_topic';
+  }
+
+  // Enhanced fallback scraping with viral content detection
   async scrapeTwitterFromGetDayTrends() {
     try {
       const response = await axios.get('https://getdaytrends.com/india', {
@@ -1548,55 +1733,74 @@ class TrendTracker {
       const $ = cheerio.load(response.data);
       const trends = [];
 
-      // Extract trends from various possible selectors
+      // Enhanced selectors for better trend extraction
       const selectors = [
         '.trend',
         '.trend-item',
         '.hashtag',
         '[data-trend]',
         'td a',
+        '.trending-topic',
+        '.viral-trend',
       ];
 
       for (const selector of selectors) {
         $(selector).each((i, element) => {
-          if (trends.length >= 15) return false;
+          if (trends.length >= 20) return false;
 
           const text = $(element).text().trim();
           const href = $(element).attr('href');
 
-          if (text && text.length > 1 && text.length < 80) {
+          if (text && text.length > 1 && text.length < 100) {
             const cleanText = text
               .replace(/^\d+\.?\s*/, '')
               .replace(/\s*tweets.*$/i, '')
+              .replace(/\s*K tweets.*$/i, '')
+              .replace(/\s*M tweets.*$/i, '')
               .trim();
 
             if (cleanText && !trends.some((t) => t.title === cleanText)) {
-              trends.push({
-                title: cleanText,
-                source: 'getdaytrends.com',
-                url: href || 'https://getdaytrends.com/india',
-                type: 'hashtag',
-                score: this.scoreTwitterTrend(cleanText),
-                platform: 'Twitter',
-              });
+              const score = this.scoreTwitterTrend(cleanText);
+
+              // Only include trends with viral potential
+              if (score >= 5 || this.isViralTwitterContent(cleanText)) {
+                trends.push({
+                  title: cleanText,
+                  source: 'getdaytrends.com',
+                  url:
+                    href ||
+                    `https://twitter.com/search?q=${encodeURIComponent(
+                      cleanText
+                    )}`,
+                  type: this.getTwitterContentType(cleanText),
+                  score: score,
+                  platform: 'Twitter',
+                  category: this.categorizeTwitterTrend(cleanText),
+                });
+              }
             }
           }
         });
 
-        if (trends.length >= 10) break;
+        if (trends.length >= 12) break;
       }
 
+      // Sort by score and return top viral trends
+      const sortedTrends = trends
+        .sort((a, b) => b.score - a.score)
+        .slice(0, 15);
+
       console.log(
-        `📱 Found ${trends.length} Twitter trends from getdaytrends.com`
+        `📱 Found ${sortedTrends.length} viral Twitter trends from getdaytrends.com`
       );
-      return trends.slice(0, 15);
+      return sortedTrends;
     } catch (error) {
       console.error('❌ Error scraping getdaytrends.com:', error.message);
       return [];
     }
   }
 
-  // Score Twitter trends with additional hashtag bonuses
+  // Enhanced scoring for viral Twitter trends
   scoreTwitterTrend(trendText) {
     let score = this.scoreHeadline(trendText, '');
 
@@ -1609,9 +1813,112 @@ class TrendTracker {
       score += 10; // Mention bonus
     }
 
-    // Bonus for trending indicators
     const trendLower = trendText.toLowerCase();
-    if (trendLower.includes('trending') || trendLower.includes('viral')) {
+
+    // MAJOR BONUS for breaking news indicators
+    const breakingKeywords = [
+      'breaking',
+      'urgent',
+      'alert',
+      'live',
+      'now',
+      'just in',
+      'developing',
+      'बड़ी खबर',
+      'तत्काल',
+      'अभी',
+      'लाइव',
+    ];
+    if (breakingKeywords.some((keyword) => trendLower.includes(keyword))) {
+      score += 35; // High priority for breaking news
+    }
+
+    // VIRAL content indicators
+    const viralKeywords = [
+      'viral',
+      'trending',
+      'shocking',
+      'exposed',
+      'scandal',
+      'controversy',
+      'वायरल',
+      'ट्रेंडिंग',
+    ];
+    if (viralKeywords.some((keyword) => trendLower.includes(keyword))) {
+      score += 25;
+    }
+
+    // SENSATIONAL terms
+    const sensationalKeywords = [
+      'massive',
+      'huge',
+      'major',
+      'historic',
+      'unprecedented',
+      'dramatic',
+      'explosive',
+      'devastating',
+      'stunning',
+      'बड़ा',
+      'भारी',
+      'ऐतिहासिक',
+    ];
+    if (sensationalKeywords.some((keyword) => trendLower.includes(keyword))) {
+      score += 20;
+    }
+
+    // HIGH-IMPACT political/social topics
+    const politicalKeywords = [
+      'modi',
+      'rahul',
+      'kejriwal',
+      'parliament',
+      'supreme court',
+      'cbi',
+      'ed',
+      'मोदी',
+      'राहुल',
+      'केजरीवाल',
+      'संसद',
+    ];
+    if (politicalKeywords.some((keyword) => trendLower.includes(keyword))) {
+      score += 25;
+    }
+
+    // CRIME and justice (high viral potential)
+    const crimeKeywords = [
+      'arrest',
+      'raid',
+      'murder',
+      'rape',
+      'scam',
+      'corruption',
+      'fraud',
+      'terror',
+      'attack',
+      'गिरफ्तार',
+      'छापेमारी',
+      'हत्या',
+      'घोटाला',
+    ];
+    if (crimeKeywords.some((keyword) => trendLower.includes(keyword))) {
+      score += 30; // Crime news tends to go viral
+    }
+
+    // CELEBRITY/ENTERTAINMENT viral content
+    const entertainmentKeywords = [
+      'bollywood',
+      'cricket',
+      'ipl',
+      'wedding',
+      'death',
+      'accident',
+      'बॉलीवुड',
+      'क्रिकेट',
+      'शादी',
+      'मौत',
+    ];
+    if (entertainmentKeywords.some((keyword) => trendLower.includes(keyword))) {
       score += 20;
     }
 
@@ -1622,10 +1929,20 @@ class TrendTracker {
       trendLower.includes('भारत') ||
       trendLower.includes('hindi')
     ) {
+      score += 15; // Increased Indian context bonus
+    }
+
+    // Length penalty for very short trends (likely not descriptive enough)
+    if (trendText.length < 10) {
+      score -= 5;
+    }
+
+    // Bonus for mixed language content (Hindi + English = more viral in India)
+    if (/[\u0900-\u097F]/.test(trendText) && /[a-zA-Z]/.test(trendText)) {
       score += 10;
     }
 
-    return score;
+    return Math.max(0, score); // Ensure non-negative score
   }
 
   // Cross-match topics across different sources
@@ -1749,14 +2066,15 @@ class TrendTracker {
       });
 
     // Section 2: Twitter Trending (India)
-    console.log('\n📱 TWITTER TRENDING HASHTAGS & TOPICS (INDIA)');
+    console.log('\n📱 TWITTER VIRAL & BREAKING TRENDS (INDIA)');
     console.log('-'.repeat(40));
     twitterData
       .sort((a, b) => b.score - a.score)
       .forEach((trend, index) => {
         console.log(`${index + 1}. [Score: ${trend.score}] ${trend.title}`);
-        console.log(`   Source: ${trend.source}`);
+        console.log(`   Category: ${trend.category || 'General'}`);
         console.log(`   Type: ${trend.type}`);
+        console.log(`   Source: ${trend.source}`);
         console.log(`   URL: ${trend.url}\n`);
       });
 
