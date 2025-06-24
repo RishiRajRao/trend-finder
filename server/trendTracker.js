@@ -165,25 +165,88 @@ class TrendTracker {
         return [];
       }
 
-      const response = await this.youtube.videos.list({
-        part: 'snippet,statistics',
-        chart: 'mostPopular',
+      // Get videos from last 12 hours that are trending/viral
+      const twelveHoursAgo = new Date(
+        Date.now() - 12 * 60 * 60 * 1000
+      ).toISOString();
+
+      const response = await this.youtube.search.list({
+        part: 'snippet',
+        type: 'video',
         regionCode: 'IN',
-        maxResults: 10,
+        publishedAfter: twelveHoursAgo, // Only videos from last 12 hours
+        order: 'viewCount', // Sort by views for viral content
+        videoDuration: 'short', // Only YouTube Shorts (under 60 seconds)
+        maxResults: 50, // Get more to filter for viral ones
+        q: 'trending OR viral OR breaking OR latest OR shorts', // Target viral keywords + shorts
       });
 
-      return response.data.items.map((video) => ({
-        title: video.snippet.title,
-        channel: video.snippet.channelTitle,
-        views: parseInt(video.statistics.viewCount),
-        url: `https://www.youtube.com/watch?v=${video.id}`,
-        publishedAt: video.snippet.publishedAt,
-        score: this.scoreHeadline(
-          video.snippet.title,
-          video.snippet.channelTitle || ''
-        ),
-        category: video.snippet.categoryId,
-      }));
+      if (!response.data.items || response.data.items.length === 0) {
+        console.log(
+          '🔄 No recent viral videos found, falling back to mostPopular...'
+        );
+        // Fallback to original method if no recent viral content
+        const fallbackResponse = await this.youtube.videos.list({
+          part: 'snippet,statistics',
+          chart: 'mostPopular',
+          regionCode: 'IN',
+          maxResults: 10,
+        });
+        return fallbackResponse.data.items.map((video) => ({
+          title: video.snippet.title,
+          channel: video.snippet.channelTitle,
+          views: parseInt(video.statistics.viewCount),
+          url: `https://www.youtube.com/watch?v=${video.id}`,
+          publishedAt: video.snippet.publishedAt,
+          score: this.scoreHeadline(
+            video.snippet.title,
+            video.snippet.channelTitle || ''
+          ),
+          category: video.snippet.categoryId,
+          timeframe: 'Overall Popular (Fallback)',
+        }));
+      }
+
+      // Get detailed statistics for the recent videos
+      const videoIds = response.data.items
+        .map((item) => item.id.videoId)
+        .join(',');
+      const statsResponse = await this.youtube.videos.list({
+        part: 'statistics',
+        id: videoIds,
+      });
+
+      // Combine search results with statistics
+      const videosWithStats = response.data.items.map((video, index) => {
+        const stats = statsResponse.data.items[index]?.statistics || {};
+        return {
+          title: video.snippet.title,
+          channel: video.snippet.channelTitle,
+          views: parseInt(stats.viewCount || 0),
+          url: `https://www.youtube.com/watch?v=${video.id.videoId}`,
+          publishedAt: video.snippet.publishedAt,
+          score: this.scoreHeadline(
+            video.snippet.title,
+            video.snippet.channelTitle || ''
+          ),
+          category: video.snippet.categoryId,
+          timeframe: 'Last 12 Hours',
+        };
+      });
+
+      // Filter for viral Shorts (lower thresholds since Shorts go viral faster)
+      const viralShorts = videosWithStats.filter(
+        (video) =>
+          video.views >= 5000 || // At least 5K views in 12 hours for Shorts
+          video.title.toLowerCase().includes('viral') ||
+          video.title.toLowerCase().includes('trending') ||
+          video.title.toLowerCase().includes('breaking') ||
+          video.title.toLowerCase().includes('shorts') ||
+          video.title.toLowerCase().includes('#shorts')
+      );
+
+      // Sort by views and return top 10 viral Shorts
+      return viralShorts.sort((a, b) => b.views - a.views).slice(0, 10);
     } catch (error) {
       console.error('❌ Error fetching YouTube trends:', error.message);
       return [];
