@@ -1,0 +1,23 @@
+{
+  "name": "trend-finder-poc",
+  "version": "1.0.0",
+  "description": "A POC for trend finder application with Node.js server and Vue.js client",
+  "scripts": {
+    "dev": "concurrently \"npm run server\" \"npm run client\"",
+    "server": "cd server && npm run dev",
+    "client": "cd client && npm run dev",
+    "install-all": "npm install && cd server && npm install && cd ../client && npm install",
+    "build": "cd client && npm run build"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  },
+  "keywords": [
+    "trend-finder",
+    "nodejs",
+    "vuejs",
+    "poc"
+  ],
+  "author": "",
+  "license": "MIT"
+}
