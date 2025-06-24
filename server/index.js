@@ -210,6 +210,75 @@ app.get('/api/live-trends/reddit', async (req, res) => {
   }
 });
 
+// AI-powered cross-matched themes endpoint
+app.get('/api/live-trends/themes', async (req, res) => {
+  try {
+    console.log('🤖 Fetching AI-powered cross-matched themes...');
+
+    // Fetch data from all sources
+    const [
+      newsGNews,
+      newsMediaStack,
+      youtubeData,
+      googleTrendsData,
+      twitterData,
+      redditData,
+    ] = await Promise.all([
+      trendTracker.fetchGNews(),
+      trendTracker.fetchMediaStack(),
+      trendTracker.fetchYouTubeTrending(),
+      trendTracker.fetchGoogleTrends(),
+      trendTracker.fetchTwitterTrends(),
+      trendTracker.scrapeRedditTrends(),
+    ]);
+
+    const allNewsData = [...newsGNews, ...newsMediaStack];
+
+    // Get AI-powered cross-matched themes
+    const crossMatchedThemes = await trendTracker.crossMatchTopics(
+      allNewsData,
+      youtubeData,
+      googleTrendsData,
+      twitterData,
+      redditData
+    );
+
+    res.json({
+      success: true,
+      data: crossMatchedThemes,
+      count: crossMatchedThemes.length,
+      timestamp: new Date().toISOString(),
+      meta: {
+        method:
+          crossMatchedThemes.length > 0 && crossMatchedThemes[0].aiGenerated
+            ? 'OpenAI GPT-3.5-turbo'
+            : 'Manual keyword matching',
+        totalAnalyzed:
+          allNewsData.length +
+          youtubeData.length +
+          googleTrendsData.length +
+          twitterData.length +
+          redditData.length,
+        themesFound: crossMatchedThemes.length,
+        criteria: [
+          'Same events described differently',
+          'Related topics',
+          'Common personalities',
+          'Similar incidents',
+          'Trending subjects',
+        ],
+      },
+    });
+  } catch (error) {
+    console.error('Error fetching cross-matched themes:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch cross-matched themes',
+      error: error.message,
+    });
+  }
+});
+
 // AI-powered viral content sorting endpoint
 app.get('/api/live-trends/viral', async (req, res) => {
   try {
@@ -290,6 +359,9 @@ app.listen(PORT, () => {
   console.log(`   GET /api/live-trends/youtube - YouTube trends only`);
   console.log(`   GET /api/live-trends/google - Google trends only`);
   console.log(`   GET /api/live-trends/reddit - Reddit trending posts only`);
+  console.log(
+    `   GET /api/live-trends/themes - 🤖 AI-powered cross-matched themes`
+  );
   console.log(
     `   GET /api/live-trends/viral - 🤖 AI-powered viral content sorting`
   );

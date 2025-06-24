@@ -1946,7 +1946,236 @@ class TrendTracker {
   }
 
   // Cross-match topics across different sources
-  crossMatchTopics(
+  // AI-powered cross-matching to find common themes across sources
+  async crossMatchTopics(
+    newsData,
+    youtubeData,
+    googleTrendsData,
+    twitterData = [],
+    redditData = []
+  ) {
+    try {
+      // Check if OpenAI is available
+      if (
+        !process.env.OPENAI_API_KEY ||
+        process.env.OPENAI_API_KEY === 'your_openai_api_key_here'
+      ) {
+        console.log(
+          '⚠️ OpenAI API key not configured, using manual cross-matching'
+        );
+        return this.manualCrossMatch(
+          newsData,
+          youtubeData,
+          googleTrendsData,
+          twitterData,
+          redditData
+        );
+      }
+
+      // Prepare content from all sources for AI analysis
+      const allContent = [];
+
+      newsData.forEach((item, index) => {
+        allContent.push({
+          id: `news_${index}`,
+          title: item.title,
+          source: 'News',
+          type: 'news',
+        });
+      });
+
+      youtubeData.forEach((item, index) => {
+        allContent.push({
+          id: `youtube_${index}`,
+          title: item.title,
+          source: 'YouTube',
+          type: 'youtube',
+        });
+      });
+
+      twitterData.forEach((item, index) => {
+        allContent.push({
+          id: `twitter_${index}`,
+          title: item.title,
+          source: 'Twitter',
+          type: 'twitter',
+        });
+      });
+
+      googleTrendsData.forEach((item, index) => {
+        allContent.push({
+          id: `google_${index}`,
+          title: item.title,
+          source: 'Google Trends',
+          type: 'google_trends',
+        });
+      });
+
+      redditData.forEach((item, index) => {
+        allContent.push({
+          id: `reddit_${index}`,
+          title: item.title,
+          source: 'Reddit',
+          type: 'reddit',
+        });
+      });
+
+      // Limit to 40 items for API efficiency
+      const contentForAI = allContent.slice(0, 40);
+
+      const contentList = contentForAI
+        .map((item, index) => `${index + 1}. [${item.source}] "${item.title}"`)
+        .join('\n');
+
+      const prompt = `You are an expert at identifying common themes and topics across different news and social media sources.
+
+Analyze the following content from various sources and identify the TOP 3 COMMON THEMES that appear across MULTIPLE sources (News, YouTube, Twitter, Google Trends, Reddit).
+
+Look for thematic connections like:
+- Same events described differently (e.g., "Israel-Iran conflict" and "Middle East crisis")  
+- Related topics (e.g., "Cricket match" and "India vs England")
+- Common personalities (e.g., "Modi announces" and "PM Modi")
+- Similar incidents (e.g., "Train accident" and "Railway mishap")
+- Trending subjects (e.g., "Bollywood wedding" and "Celebrity marriage")
+
+Content to analyze:
+${contentList}
+
+For each common theme, provide:
+1. Theme name (concise, 2-4 words)
+2. Brief description 
+3. Which content items belong to this theme (use the numbers from the list)
+
+Return ONLY a JSON array with exactly 3 themes:
+[
+  {
+    "theme": "Theme Name",
+    "description": "Brief description of the theme",
+    "items": [1, 5, 12, 18],
+    "sources": ["News", "YouTube", "Twitter"]
+  }
+]`;
+
+      // Call OpenAI API
+      const OpenAI = require('openai');
+      const openai = new OpenAI({
+        apiKey: process.env.OPENAI_API_KEY,
+      });
+
+      console.log('🤖 Analyzing common themes with OpenAI...');
+
+      const completion = await openai.chat.completions.create({
+        model: 'gpt-3.5-turbo',
+        messages: [
+          {
+            role: 'system',
+            content:
+              'You are an expert at identifying thematic connections across news and social media. Return only valid JSON arrays.',
+          },
+          {
+            role: 'user',
+            content: prompt,
+          },
+        ],
+        max_tokens: 500,
+        temperature: 0.3,
+      });
+
+      const aiResponse = completion.choices[0].message.content.trim();
+      console.log('🎯 OpenAI Themes Response:', aiResponse);
+
+      // Parse AI response
+      let themes;
+      try {
+        themes = JSON.parse(aiResponse);
+      } catch (parseError) {
+        console.log(
+          '⚠️ AI response parsing failed, using manual cross-matching'
+        );
+        return this.manualCrossMatch(
+          newsData,
+          youtubeData,
+          googleTrendsData,
+          twitterData,
+          redditData
+        );
+      }
+
+      // Convert AI themes to our format
+      const crossMatchedTopics = themes.map((theme, index) => {
+        const relatedContent = [];
+        let totalScore = 0;
+
+        theme.items.forEach((itemIndex) => {
+          const adjustedIndex = itemIndex - 1; // Convert to 0-based
+          if (adjustedIndex >= 0 && adjustedIndex < contentForAI.length) {
+            const content = contentForAI[adjustedIndex];
+
+            // Find original data to get scores
+            let originalData = null;
+            let score = 0;
+
+            if (content.type === 'news') {
+              const newsIndex = parseInt(content.id.split('_')[1]);
+              originalData = newsData[newsIndex];
+              score = originalData?.score || 0;
+            } else if (content.type === 'youtube') {
+              const youtubeIndex = parseInt(content.id.split('_')[1]);
+              originalData = youtubeData[youtubeIndex];
+              score = originalData?.score || 0;
+            } else if (content.type === 'twitter') {
+              const twitterIndex = parseInt(content.id.split('_')[1]);
+              originalData = twitterData[twitterIndex];
+              score = originalData?.score || 0;
+            } else if (content.type === 'google_trends') {
+              const googleIndex = parseInt(content.id.split('_')[1]);
+              originalData = googleTrendsData[googleIndex];
+              score = originalData?.score || 0;
+            } else if (content.type === 'reddit') {
+              const redditIndex = parseInt(content.id.split('_')[1]);
+              originalData = redditData[redditIndex];
+              score = originalData?.score || 0;
+            }
+
+            if (originalData) {
+              relatedContent.push({
+                type: content.type,
+                data: originalData,
+              });
+              totalScore += score;
+            }
+          }
+        });
+
+        return {
+          keyword: theme.theme,
+          description: theme.description,
+          sources: relatedContent,
+          totalScore: totalScore,
+          aiGenerated: true,
+          sourceTypes: [...new Set(relatedContent.map((c) => c.type))],
+        };
+      });
+
+      console.log(
+        `✅ AI identified ${crossMatchedTopics.length} common themes`
+      );
+      return crossMatchedTopics.filter((topic) => topic.sources.length > 1); // Only multi-source themes
+    } catch (error) {
+      console.error('❌ Error in AI cross-matching:', error.message);
+      console.log('🔄 Falling back to manual cross-matching...');
+      return this.manualCrossMatch(
+        newsData,
+        youtubeData,
+        googleTrendsData,
+        twitterData,
+        redditData
+      );
+    }
+  }
+
+  // Manual cross-matching fallback (improved version)
+  manualCrossMatch(
     newsData,
     youtubeData,
     googleTrendsData,
@@ -1955,70 +2184,104 @@ class TrendTracker {
   ) {
     const allTopics = new Map();
 
-    // Process news articles
-    newsData.forEach((article) => {
-      const key = this.extractKeywords(article.title).join(' ');
-      if (key) {
-        if (!allTopics.has(key)) {
-          allTopics.set(key, { keyword: key, sources: [], totalScore: 0 });
-        }
-        allTopics.get(key).sources.push({ type: 'news', data: article });
-        allTopics.get(key).totalScore += article.score;
-      }
-    });
+    // Process all content with better keyword extraction
+    const processContent = (items, type) => {
+      items.forEach((item) => {
+        const keywords = this.extractBetterKeywords(item.title);
+        keywords.forEach((keyword) => {
+          if (!allTopics.has(keyword)) {
+            allTopics.set(keyword, {
+              keyword,
+              sources: [],
+              totalScore: 0,
+              sourceTypes: new Set(),
+            });
+          }
+          allTopics.get(keyword).sources.push({ type, data: item });
+          allTopics.get(keyword).totalScore += item.score || 0;
+          allTopics.get(keyword).sourceTypes.add(type);
+        });
+      });
+    };
 
-    // Process Twitter trends
-    twitterData.forEach((trend) => {
-      const key = this.extractKeywords(trend.title).join(' ');
-      if (key) {
-        if (!allTopics.has(key)) {
-          allTopics.set(key, { keyword: key, sources: [], totalScore: 0 });
-        }
-        allTopics.get(key).sources.push({ type: 'twitter', data: trend });
-        allTopics.get(key).totalScore += trend.score;
-      }
-    });
+    processContent(newsData, 'news');
+    processContent(youtubeData, 'youtube');
+    processContent(twitterData, 'twitter');
+    processContent(googleTrendsData, 'google_trends');
+    processContent(redditData, 'reddit');
 
-    // Process YouTube videos
-    youtubeData.forEach((video) => {
-      const key = this.extractKeywords(video.title).join(' ');
-      if (key) {
-        if (!allTopics.has(key)) {
-          allTopics.set(key, { keyword: key, sources: [], totalScore: 0 });
-        }
-        allTopics.get(key).sources.push({ type: 'youtube', data: video });
-        allTopics.get(key).totalScore += video.score;
-      }
-    });
-
-    // Process Google Trends
-    googleTrendsData.forEach((trend) => {
-      const key = this.extractKeywords(trend.title).join(' ');
-      if (key) {
-        if (!allTopics.has(key)) {
-          allTopics.set(key, { keyword: key, sources: [], totalScore: 0 });
-        }
-        allTopics.get(key).sources.push({ type: 'trends', data: trend });
-        allTopics.get(key).totalScore += trend.score;
-      }
-    });
-
-    // Process Reddit posts
-    redditData.forEach((post) => {
-      const key = this.extractKeywords(post.title).join(' ');
-      if (key) {
-        if (!allTopics.has(key)) {
-          allTopics.set(key, { keyword: key, sources: [], totalScore: 0 });
-        }
-        allTopics.get(key).sources.push({ type: 'reddit', data: post });
-        allTopics.get(key).totalScore += post.score;
-      }
-    });
-
-    // Return cross-matched topics sorted by score
+    // Return topics that appear in multiple sources
     return Array.from(allTopics.values())
-      .filter((topic) => topic.sources.length > 1) // Only topics appearing in multiple sources
-      .sort((a, b) => b.totalScore - a.totalScore);
+      .filter((topic) => topic.sourceTypes.size > 1) // Must appear in multiple source types
+      .map((topic) => ({
+        ...topic,
+        sourceTypes: Array.from(topic.sourceTypes),
+        aiGenerated: false,
+      }))
+      .sort((a, b) => b.totalScore - a.totalScore)
+      .slice(0, 5); // Top 5 cross-matched topics
+  }
+
+  // Better keyword extraction for manual fallback
+  extractBetterKeywords(title) {
+    const keywords = new Set();
+    const cleanTitle = title
+      .toLowerCase()
+      .replace(/[^\w\s]/g, ' ')
+      .trim();
+
+    // Extract important terms
+    const importantTerms = [
+      'israel',
+      'iran',
+      'modi',
+      'india',
+      'cricket',
+      'bollywood',
+      'election',
+      'court',
+      'police',
+      'government',
+      'ceasefire',
+      'war',
+      'conflict',
+      'attack',
+      'breaking',
+      'live',
+      'news',
+      'update',
+      'announces',
+      'death',
+      'arrest',
+    ];
+
+    importantTerms.forEach((term) => {
+      if (cleanTitle.includes(term)) {
+        keywords.add(term);
+      }
+    });
+
+    // Extract multi-word phrases
+    const phrases = [
+      'israel iran',
+      'iran israel',
+      'middle east',
+      'air india',
+      'train accident',
+      'supreme court',
+      'high court',
+      'pm modi',
+      'bollywood star',
+      'cricket match',
+    ];
+
+    phrases.forEach((phrase) => {
+      if (cleanTitle.includes(phrase)) {
+        keywords.add(phrase);
+      }
+    });
+
+    return Array.from(keywords);
   }
 
   // Extract keywords from title for cross-matching
@@ -2122,16 +2385,29 @@ class TrendTracker {
         console.log(`   URL: ${post.url}\n`);
       });
 
-    // Section 6: Cross-Matched Topics
-    console.log('\n🔗 CROSS-MATCHED TRENDING TOPICS');
+    // Section 6: AI-Enhanced Cross-Matched Topics
+    console.log('\n🔗 AI-ENHANCED CROSS-MATCHED THEMES');
     console.log('-'.repeat(40));
-    crossMatched.slice(0, 5).forEach((topic, index) => {
+    crossMatched.slice(0, 3).forEach((topic, index) => {
       console.log(
-        `${index + 1}. [Total Score: ${topic.totalScore}] ${topic.keyword}`
+        `${index + 1}. [Score: ${topic.totalScore}] ${topic.keyword}`
       );
+      if (topic.description) {
+        console.log(`   Description: ${topic.description}`);
+      }
       console.log(
-        `   Found in: ${topic.sources.map((s) => s.type).join(', ')}`
+        `   Sources: ${
+          topic.sourceTypes
+            ? topic.sourceTypes.join(', ')
+            : topic.sources.map((s) => s.type).join(', ')
+        }`
       );
+      console.log(`   Items: ${topic.sources.length} related content pieces`);
+      if (topic.aiGenerated) {
+        console.log('   🤖 AI-identified theme');
+      } else {
+        console.log('   📊 Manual keyword matching');
+      }
       console.log('');
     });
 
@@ -2191,8 +2467,8 @@ class TrendTracker {
       // Combine news sources
       const allNewsData = [...newsGNews, ...newsMediaStack];
 
-      // Cross-match topics including Reddit
-      const crossMatchedTopics = this.crossMatchTopics(
+      // Cross-match topics including Reddit with AI
+      const crossMatchedTopics = await this.crossMatchTopics(
         allNewsData,
         youtubeData,
         googleTrendsData,
