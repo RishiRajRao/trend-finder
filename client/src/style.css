@@ -144,6 +144,22 @@ button {
   color: #ca8a04;
 }
 
+.text-yellow-800 {
+  color: #92400e;
+}
+
+.text-red-800 {
+  color: #991b1b;
+}
+
+.text-indigo-800 {
+  color: #3730a3;
+}
+
+.text-teal-800 {
+  color: #115e59;
+}
+
 .text-primary {
   color: #667eea;
 }
@@ -192,8 +208,24 @@ button {
   background-color: #f3f4f6;
 }
 
+.bg-yellow-100 {
+  background-color: #fef3c7;
+}
+
 .bg-red-50 {
   background-color: #fef2f2;
+}
+
+.bg-red-100 {
+  background-color: #fee2e2;
+}
+
+.bg-indigo-100 {
+  background-color: #e0e7ff;
+}
+
+.bg-teal-100 {
+  background-color: #ccfbf1;
 }
 
 .bg-red-500 {

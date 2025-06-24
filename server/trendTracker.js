@@ -94,7 +94,8 @@ class TrendTracker {
             token: this.gnewsApiKey,
             country: 'in',
             lang: 'en',
-            max: 10,
+            category: 'general', // Focus on general news, not entertainment
+            max: 15,
           },
         }
       );
@@ -130,7 +131,11 @@ class TrendTracker {
           access_key: this.mediastackApiKey,
           countries: 'in',
           languages: 'en',
-          limit: 10,
+          sort: 'popularity', // Sort by popularity for viral content
+          categories: 'general,entertainment,sports,technology', // Focus on viral categories
+          keywords:
+            'viral,trending,breaking,popular,watch,latest,exclusive,video,shares,social media', // Target viral keywords
+          limit: 15,
         },
       });
 
@@ -688,10 +693,10 @@ class TrendTracker {
       // Enhanced subreddits with specific focus on trending posts
       const subreddits = [
         { name: 'india', url: 'https://www.reddit.com/r/india/hot/.json' },
-        {
-          name: 'worldnews',
-          url: 'https://www.reddit.com/r/worldnews/hot/.json',
-        },
+        // {
+        //   name: 'worldnews',
+        //   url: 'https://www.reddit.com/r/worldnews/hot/.json',
+        // },
         {
           name: 'unpopularopinion',
           url: 'https://www.reddit.com/r/unpopularopinion/hot/.json',
@@ -699,6 +704,22 @@ class TrendTracker {
         {
           name: 'india-rising',
           url: 'https://www.reddit.com/r/india/rising/.json',
+        },
+        {
+          name: 'IndianDankMemes',
+          url: 'https://www.reddit.com/r/IndianDankMemes/hot/.json',
+        },
+        {
+          name: 'indiauncensored',
+          url: 'https://www.reddit.com/r/indiauncensored/hot/.json',
+        },
+        {
+          name: 'IndiaNews',
+          url: 'https://www.reddit.com/r/IndiaNews/hot/.json',
+        },
+        {
+          name: 'IndiaSpeaks',
+          url: 'https://www.reddit.com/r/IndiaSpeaks/hot/.json',
         },
       ];
 
