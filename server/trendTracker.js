@@ -2049,7 +2049,8 @@ class TrendTracker {
     googleTrendsData,
     twitterData,
     redditData,
-    crossMatched
+    crossMatched,
+    viralContent = []
   ) {
     console.log('\n🔥 COMPREHENSIVE TREND TRACKER - INDIA 🇮🇳');
     console.log('='.repeat(60));
@@ -2134,6 +2135,34 @@ class TrendTracker {
       console.log('');
     });
 
+    // Section 7: AI Viral Content Selection
+    if (viralContent && viralContent.length > 0) {
+      console.log('\n🤖 AI-POWERED VIRAL CONTENT SELECTION');
+      console.log('-'.repeat(40));
+      viralContent.forEach((item, index) => {
+        console.log(
+          `${index + 1}. [Viral Score: ${item.viralScore || item.score}] ${
+            item.title
+          }`
+        );
+        console.log(`   Type: ${item.type} | Source: ${item.source}`);
+        if (item.aiSelected) {
+          console.log(`   🎯 AI Ranked: #${item.viralRank} (OpenAI selected)`);
+        } else {
+          console.log(
+            `   📊 Manual Score: ${item.viralScore} (Fallback method)`
+          );
+        }
+        if (item.views)
+          console.log(`   Views: ${this.formatNumber(item.views)}`);
+        if (item.upvotes)
+          console.log(
+            `   Upvotes: ${item.upvotes} | Comments: ${item.comments}`
+          );
+        console.log(`   URL: ${item.url || 'N/A'}\n`);
+      });
+    }
+
     console.log('\n✨ Analysis Complete!');
   }
 
@@ -2171,6 +2200,15 @@ class TrendTracker {
         redditData
       );
 
+      // Sort content by viral potential using OpenAI
+      const viralContent = await this.sortViral(
+        allNewsData,
+        youtubeData,
+        googleTrendsData,
+        twitterData,
+        redditData
+      );
+
       // Display results
       this.displayResults(
         allNewsData,
@@ -2178,7 +2216,8 @@ class TrendTracker {
         googleTrendsData,
         twitterData,
         redditData,
-        crossMatchedTopics
+        crossMatchedTopics,
+        viralContent
       );
 
       // Return structured data for API use
@@ -2189,6 +2228,7 @@ class TrendTracker {
         twitter: twitterData,
         reddit: redditData,
         crossMatched: crossMatchedTopics,
+        viralContent: viralContent,
         summary: {
           totalNews: allNewsData.length,
           totalYouTube: youtubeData.length,
@@ -2196,12 +2236,246 @@ class TrendTracker {
           totalTwitter: twitterData.length,
           totalReddit: redditData.length,
           crossMatchedTopics: crossMatchedTopics.length,
+          viralContent: viralContent.length,
         },
       };
     } catch (error) {
       console.error('❌ Error in trend analysis:', error.message);
       throw error;
     }
+  }
+
+  // Sort content by viral potential using OpenAI
+  async sortViral(
+    newsData,
+    youtubeData,
+    googleTrendsData,
+    twitterData = [],
+    redditData = []
+  ) {
+    try {
+      // Combine all content into a simple array for AI analysis
+      const allContent = [];
+
+      // Add news articles
+      newsData.forEach((item) => {
+        allContent.push({
+          title: item.title,
+          source: item.source,
+          type: 'News',
+          score: item.score,
+          url: item.url,
+        });
+      });
+
+      // Add YouTube videos
+      youtubeData.forEach((item) => {
+        allContent.push({
+          title: item.title,
+          source: item.channel,
+          type: 'YouTube',
+          score: item.score,
+          views: item.views,
+          url: item.url,
+        });
+      });
+
+      // Add Twitter trends
+      twitterData.forEach((item) => {
+        allContent.push({
+          title: item.title,
+          source: item.source,
+          type: 'Twitter',
+          score: item.score,
+          url: item.url,
+        });
+      });
+
+      // Add Google Trends
+      googleTrendsData.forEach((item) => {
+        allContent.push({
+          title: item.title,
+          source: 'Google Trends',
+          type: 'Google Trends',
+          score: item.score,
+          traffic: item.traffic,
+        });
+      });
+
+      // Add Reddit posts
+      redditData.forEach((item) => {
+        allContent.push({
+          title: item.title,
+          source: item.source,
+          type: 'Reddit',
+          score: item.score,
+          upvotes: item.upvotes,
+          comments: item.comments,
+          url: item.url,
+        });
+      });
+
+      // Check if OpenAI is available
+      if (
+        !process.env.OPENAI_API_KEY ||
+        process.env.OPENAI_API_KEY === 'your_openai_api_key_here'
+      ) {
+        console.log(
+          '⚠️ OpenAI API key not configured, using manual viral scoring'
+        );
+        return this.manualViralSort(allContent);
+      }
+
+      // Prepare content for OpenAI (limit to top 30 items by score)
+      const topContent = allContent
+        .sort((a, b) => b.score - a.score)
+        .slice(0, 30);
+
+      const contentList = topContent
+        .map(
+          (item, index) =>
+            `${index + 1}. [${item.type}] "${item.title}" (Score: ${
+              item.score
+            })`
+        )
+        .join('\n');
+
+      const prompt = `You are an expert in viral content analysis for Indian audiences. Below is a list of trending content from various sources. 
+
+Rank these items by their VIRAL POTENTIAL for Indian social media, considering:
+- Breaking news impact
+- Controversy and debate potential  
+- Celebrity/entertainment value
+- Emotional impact
+- Social media shareability
+- Indian cultural relevance
+
+Content to analyze:
+${contentList}
+
+Return ONLY the top 15 items ranked by viral potential. Format your response as a simple numbered list using the original numbers:
+1. [Original number from list]
+2. [Original number from list]
+...and so on`;
+
+      // Call OpenAI API
+      const OpenAI = require('openai');
+      const openai = new OpenAI({
+        apiKey: process.env.OPENAI_API_KEY,
+      });
+
+      console.log('🤖 Analyzing viral potential with OpenAI...');
+
+      const completion = await openai.chat.completions.create({
+        model: 'gpt-3.5-turbo',
+        messages: [
+          {
+            role: 'system',
+            content:
+              'You are a viral content expert. Return only a numbered list of items ranked by viral potential.',
+          },
+          {
+            role: 'user',
+            content: prompt,
+          },
+        ],
+        max_tokens: 300,
+        temperature: 0.3,
+      });
+
+      const aiResponse = completion.choices[0].message.content.trim();
+      console.log('🎯 OpenAI Response:', aiResponse);
+
+      // Parse AI response to extract rankings
+      const lines = aiResponse.split('\n').filter((line) => line.trim());
+      const viralContent = [];
+
+      lines.forEach((line, rank) => {
+        const match = line.match(/(\d+)\./);
+        if (match) {
+          const originalIndex = parseInt(match[1]) - 1;
+          if (originalIndex >= 0 && originalIndex < topContent.length) {
+            const item = topContent[originalIndex];
+            viralContent.push({
+              ...item,
+              viralRank: rank + 1,
+              viralScore: 100 - rank * 5, // Decreasing score based on AI ranking
+              aiSelected: true,
+            });
+          }
+        }
+      });
+
+      console.log(`✅ AI selected ${viralContent.length} viral items`);
+      return viralContent.slice(0, 15); // Ensure max 15 items
+    } catch (error) {
+      console.error('❌ Error in OpenAI viral sorting:', error.message);
+      console.log('🔄 Falling back to manual viral scoring...');
+
+      // Fallback to manual sorting
+      const allContent = [
+        ...newsData,
+        ...youtubeData,
+        ...googleTrendsData,
+        ...twitterData,
+        ...redditData,
+      ];
+      return this.manualViralSort(allContent);
+    }
+  }
+
+  // Manual viral sorting fallback
+  manualViralSort(allContent) {
+    const viralKeywords = [
+      'breaking',
+      'viral',
+      'trending',
+      'shocking',
+      'exclusive',
+      'scandal',
+      'controversy',
+      'massive',
+      'urgent',
+      'alert',
+      'exposed',
+      'leaked',
+    ];
+
+    const scoredContent = allContent.map((item, index) => {
+      let viralScore = item.score || 0;
+      const title = (item.title || '').toLowerCase();
+
+      // Boost score for viral keywords
+      viralKeywords.forEach((keyword) => {
+        if (title.includes(keyword)) {
+          viralScore += 15;
+        }
+      });
+
+      // Boost for high engagement (YouTube views, Reddit upvotes)
+      if (item.views && item.views > 100000) viralScore += 20;
+      if (item.upvotes && item.upvotes > 500) viralScore += 15;
+
+      // Boost for Indian context
+      if (
+        title.includes('india') ||
+        title.includes('indian') ||
+        title.includes('modi')
+      ) {
+        viralScore += 10;
+      }
+
+      return {
+        ...item,
+        viralScore,
+        viralRank: index + 1,
+        aiSelected: false,
+      };
+    });
+
+    return scoredContent
+      .sort((a, b) => b.viralScore - a.viralScore)
+      .slice(0, 15);
   }
 }
 

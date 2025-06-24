@@ -162,6 +162,33 @@
           class="bg-white p-6 rounded-lg shadow-lg text-center card-hover cursor-pointer"
           :class="{
             'bg-gradient text-white transform -translate-y-2':
+              activeTab === 'viral',
+          }"
+          @click="activeTab = 'viral'"
+        >
+          <h3
+            class="text-2xl font-bold mb-2"
+            :class="activeTab === 'viral' ? 'text-white' : 'text-primary'"
+          >
+            🤖
+            {{
+              trendData.summary?.viralContent ||
+              trendData.viralContent?.length ||
+              0
+            }}
+          </h3>
+          <p
+            class="text-gray-600"
+            :class="{ 'text-white': activeTab === 'viral' }"
+          >
+            AI Viral
+          </p>
+        </div>
+
+        <div
+          class="bg-white p-6 rounded-lg shadow-lg text-center card-hover cursor-pointer"
+          :class="{
+            'bg-gradient text-white transform -translate-y-2':
               activeTab === 'crossmatched',
           }"
           @click="activeTab = 'crossmatched'"
@@ -208,6 +235,163 @@
 
       <!-- Tab Content -->
       <div class="block w-full p-4" style="min-height: 500px">
+        <!-- AI Viral Content Tab -->
+        <div v-if="activeTab === 'viral'" class="animate-fade-in block w-full">
+          <div
+            v-if="trendData.viralContent && trendData.viralContent.length > 0"
+          >
+            <h2
+              class="text-2xl font-bold text-gray-800 border-b-4 border-primary pb-2 mb-4"
+            >
+              🤖 AI-Powered Viral Content Selection
+            </h2>
+            <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+              <div class="flex items-center gap-2 mb-2">
+                <span class="text-lg">🎯</span>
+                <span class="font-bold text-blue-800">
+                  {{
+                    trendData.viralContent[0]?.aiSelected
+                      ? 'OpenAI GPT-3.5-turbo Analysis'
+                      : 'Manual Viral Scoring'
+                  }}
+                </span>
+              </div>
+              <p class="text-blue-700 text-sm">
+                Content ranked by viral potential for Indian audiences based on
+                breaking news impact, controversy potential, celebrity value,
+                emotional impact, and social shareability.
+              </p>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div
+                v-for="(item, index) in trendData.viralContent"
+                :key="index"
+                class="bg-white rounded-lg p-6 shadow-lg border-l-4 hover:shadow-xl transition-all duration-300"
+                :class="{
+                  'border-purple-500': item.type === 'News',
+                  'border-blue-500': item.type === 'Twitter',
+                  'border-red-500': item.type === 'YouTube',
+                  'border-green-500': item.type === 'Google Trends',
+                  'border-orange-500': item.type === 'Reddit',
+                }"
+              >
+                <div class="flex justify-between items-start mb-4">
+                  <div class="flex items-center gap-2">
+                    <span class="text-lg font-bold text-gray-700"
+                      >#{{ index + 1 }}</span
+                    >
+                    <span
+                      class="px-3 py-1 rounded-full text-xs font-bold"
+                      :class="{
+                        'bg-purple-100 text-purple-700': item.type === 'News',
+                        'bg-blue-100 text-blue-700': item.type === 'Twitter',
+                        'bg-red-100 text-red-700': item.type === 'YouTube',
+                        'bg-green-100 text-green-700':
+                          item.type === 'Google Trends',
+                        'bg-orange-100 text-orange-700': item.type === 'Reddit',
+                      }"
+                    >
+                      {{ item.type }}
+                    </span>
+                  </div>
+                  <span
+                    class="bg-gradient-to-r from-purple-500 to-blue-500 text-white px-3 py-1 rounded-full text-sm font-bold"
+                  >
+                    {{ item.viralScore || item.score }}
+                  </span>
+                </div>
+
+                <h3
+                  class="text-lg font-semibold text-gray-800 mb-3 leading-tight"
+                >
+                  {{ item.title }}
+                </h3>
+
+                <div class="mb-4">
+                  <div
+                    class="flex items-center gap-2 text-sm text-gray-600 mb-2"
+                  >
+                    <span class="font-medium">Source:</span>
+                    <span>{{ item.source }}</span>
+                  </div>
+
+                  <div
+                    v-if="item.aiSelected"
+                    class="flex items-center gap-2 text-sm mb-2"
+                  >
+                    <span class="text-green-600">🎯 AI Ranked:</span>
+                    <span
+                      class="bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs font-bold"
+                    >
+                      #{{ item.viralRank }} by OpenAI
+                    </span>
+                  </div>
+
+                  <div v-else class="flex items-center gap-2 text-sm mb-2">
+                    <span class="text-blue-600">📊 Manual Score:</span>
+                    <span
+                      class="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs font-bold"
+                    >
+                      {{ item.viralScore }} points
+                    </span>
+                  </div>
+
+                  <!-- Type-specific metrics -->
+                  <div
+                    v-if="item.views"
+                    class="flex items-center gap-2 text-sm text-gray-600"
+                  >
+                    <span class="font-medium">Views:</span>
+                    <span class="font-bold text-red-600">{{
+                      formatNumber(item.views)
+                    }}</span>
+                  </div>
+
+                  <div
+                    v-if="item.upvotes"
+                    class="flex items-center gap-4 text-sm text-gray-600"
+                  >
+                    <div class="flex items-center gap-1">
+                      <span class="font-medium">Upvotes:</span>
+                      <span class="font-bold text-orange-600">{{
+                        item.upvotes
+                      }}</span>
+                    </div>
+                    <div class="flex items-center gap-1">
+                      <span class="font-medium">Comments:</span>
+                      <span class="font-bold text-orange-600">{{
+                        item.comments
+                      }}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="flex justify-between items-center">
+                  <div class="text-xs text-gray-500">
+                    Original Score: {{ item.score || 0 }}
+                  </div>
+                  <a
+                    v-if="item.url"
+                    :href="item.url"
+                    target="_blank"
+                    class="bg-gradient-to-r from-purple-500 to-blue-500 text-white px-4 py-2 rounded-full text-sm font-bold hover:from-purple-600 hover:to-blue-600 transition-all duration-300"
+                  >
+                    View →
+                  </a>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div v-else class="text-center py-16 text-gray-600">
+            <div class="text-6xl mb-4">🤖</div>
+            <h3 class="text-xl font-semibold text-gray-800 mb-4">
+              AI Viral Analysis in Progress
+            </h3>
+            <p>Analyzing content from all sources for viral potential...</p>
+          </div>
+        </div>
+
         <!-- Cross-Matched Topics Tab -->
         <div
           v-if="activeTab === 'crossmatched'"
@@ -641,8 +825,9 @@ export default {
       trendData: null,
       loading: true,
       error: null,
-      activeTab: 'news',
+      activeTab: 'viral',
       tabs: [
+        { id: 'viral', label: 'AI Viral Content', icon: '🤖' },
         { id: 'news', label: 'News Articles', icon: '📰' },
         { id: 'twitter', label: 'Twitter Trends', icon: '📱' },
         { id: 'youtube', label: 'YouTube Videos', icon: '🎥' },

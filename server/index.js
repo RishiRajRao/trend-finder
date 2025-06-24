@@ -210,6 +210,76 @@ app.get('/api/live-trends/reddit', async (req, res) => {
   }
 });
 
+// AI-powered viral content sorting endpoint
+app.get('/api/live-trends/viral', async (req, res) => {
+  try {
+    console.log('🤖 Fetching AI-powered viral content...');
+
+    // Fetch data from all sources
+    const [
+      newsGNews,
+      newsMediaStack,
+      youtubeData,
+      googleTrendsData,
+      twitterData,
+      redditData,
+    ] = await Promise.all([
+      trendTracker.fetchGNews(),
+      trendTracker.fetchMediaStack(),
+      trendTracker.fetchYouTubeTrending(),
+      trendTracker.fetchGoogleTrends(),
+      trendTracker.fetchTwitterTrends(),
+      trendTracker.scrapeRedditTrends(),
+    ]);
+
+    const allNewsData = [...newsGNews, ...newsMediaStack];
+
+    // Get AI-sorted viral content
+    const viralContent = await trendTracker.sortViral(
+      allNewsData,
+      youtubeData,
+      googleTrendsData,
+      twitterData,
+      redditData
+    );
+
+    res.json({
+      success: true,
+      data: viralContent,
+      count: viralContent.length,
+      timestamp: new Date().toISOString(),
+      meta: {
+        method:
+          viralContent.length > 0 && viralContent[0].aiSelected
+            ? 'OpenAI GPT-3.5-turbo'
+            : 'Manual viral scoring',
+        totalAnalyzed:
+          allNewsData.length +
+          youtubeData.length +
+          googleTrendsData.length +
+          twitterData.length +
+          redditData.length,
+        viralSelected: viralContent.length,
+        criteria: [
+          'Breaking news impact',
+          'Controversy potential',
+          'Celebrity/entertainment value',
+          'Emotional impact',
+          'Social shareability',
+          'Indian relevance',
+        ],
+      },
+    });
+  } catch (error) {
+    console.error('Error fetching viral content:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch viral content',
+      error: error.message,
+    });
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`🚀 Server is running on port ${PORT}`);
   console.log(`📊 Trend Finder API available at http://localhost:${PORT}`);
@@ -220,4 +290,7 @@ app.listen(PORT, () => {
   console.log(`   GET /api/live-trends/youtube - YouTube trends only`);
   console.log(`   GET /api/live-trends/google - Google trends only`);
   console.log(`   GET /api/live-trends/reddit - Reddit trending posts only`);
+  console.log(
+    `   GET /api/live-trends/viral - 🤖 AI-powered viral content sorting`
+  );
 });
