@@ -2326,34 +2326,38 @@ class TrendTracker {
         return this.manualViralSort(allContent);
       }
 
-      // Prepare content for OpenAI (limit to top 30 items by score)
-      const topContent = allContent
-        .sort((a, b) => b.score - a.score)
-        .slice(0, 30);
+      // Prepare content for OpenAI (take all content, let AI decide)
+      const topContent = allContent.slice(0, 50); // Limit to 50 for API efficiency
 
       const contentList = topContent
         .map(
           (item, index) =>
-            `${index + 1}. [${item.type}] "${item.title}" (Score: ${
-              item.score
-            })`
+            `${index + 1}. [${item.type}] "${item.title}" - Source: ${
+              item.source
+            }${item.views ? ` (Views: ${item.views})` : ''}${
+              item.upvotes ? ` (Upvotes: ${item.upvotes})` : ''
+            }${item.traffic ? ` (Traffic: ${item.traffic})` : ''}`
         )
         .join('\n');
 
       const prompt = `You are an expert in viral content analysis for Indian audiences. Below is a list of trending content from various sources. 
 
-Rank these items by their VIRAL POTENTIAL for Indian social media, considering:
-- Breaking news impact
+IMPORTANT: Ignore any previous scores or rankings. Analyze each item purely based on its VIRAL POTENTIAL for Indian social media.
+
+Rank these items by their VIRAL POTENTIAL, considering:
+- Breaking news impact and urgency
 - Controversy and debate potential  
-- Celebrity/entertainment value
-- Emotional impact
-- Social media shareability
-- Indian cultural relevance
+- Celebrity/entertainment/Bollywood value
+- Emotional impact (anger, joy, surprise, outrage)
+- Social media shareability and discussion potential
+- Indian cultural relevance and local context
+- Trending keywords and viral indicators
+- Current events significance
 
 Content to analyze:
 ${contentList}
 
-Return ONLY the top 15 items ranked by viral potential. Format your response as a simple numbered list using the original numbers:
+Return ONLY the top 15 items with highest viral potential. Format your response as a simple numbered list using the original numbers:
 1. [Original number from list]
 2. [Original number from list]
 ...and so on`;
@@ -2391,7 +2395,8 @@ Return ONLY the top 15 items ranked by viral potential. Format your response as 
       const viralContent = [];
 
       lines.forEach((line, rank) => {
-        const match = line.match(/(\d+)\./);
+        // Look for patterns like "1. 5" or "1. [Original number]"
+        const match = line.match(/^\d+\.\s*(\d+)/);
         if (match) {
           const originalIndex = parseInt(match[1]) - 1;
           if (originalIndex >= 0 && originalIndex < topContent.length) {
@@ -2439,31 +2444,68 @@ Return ONLY the top 15 items ranked by viral potential. Format your response as 
       'alert',
       'exposed',
       'leaked',
+      'bollywood',
+      'cricket',
+      'modi',
+      'election',
+      'arrest',
+      'death',
+      'accident',
     ];
 
     const scoredContent = allContent.map((item, index) => {
-      let viralScore = item.score || 0;
+      let viralScore = 0; // Start from 0, ignore original scores
       const title = (item.title || '').toLowerCase();
 
-      // Boost score for viral keywords
+      // Score based on viral keywords
       viralKeywords.forEach((keyword) => {
         if (title.includes(keyword)) {
-          viralScore += 15;
+          viralScore += 25;
         }
       });
 
-      // Boost for high engagement (YouTube views, Reddit upvotes)
-      if (item.views && item.views > 100000) viralScore += 20;
-      if (item.upvotes && item.upvotes > 500) viralScore += 15;
+      // Score based on engagement metrics
+      if (item.views && item.views > 500000) viralScore += 40;
+      else if (item.views && item.views > 100000) viralScore += 25;
 
-      // Boost for Indian context
+      if (item.upvotes && item.upvotes > 1000) viralScore += 30;
+      else if (item.upvotes && item.upvotes > 500) viralScore += 20;
+
+      // Score for Indian context
       if (
         title.includes('india') ||
         title.includes('indian') ||
-        title.includes('modi')
+        title.includes('modi') ||
+        title.includes('delhi') ||
+        title.includes('mumbai')
       ) {
-        viralScore += 10;
+        viralScore += 20;
       }
+
+      // Score for content type priority
+      if (
+        item.type === 'News' &&
+        (title.includes('breaking') || title.includes('live'))
+      )
+        viralScore += 30;
+      if (item.type === 'Twitter' && title.startsWith('#')) viralScore += 15;
+      if (item.type === 'YouTube' && title.includes('live')) viralScore += 20;
+
+      // Score for controversy/emotion indicators
+      const emotionalWords = [
+        'angry',
+        'outrage',
+        'protest',
+        'fight',
+        'clash',
+        'attack',
+        'win',
+        'lose',
+        'victory',
+      ];
+      emotionalWords.forEach((word) => {
+        if (title.includes(word)) viralScore += 15;
+      });
 
       return {
         ...item,
