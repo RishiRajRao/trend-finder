@@ -13,6 +13,37 @@ const trendTracker = new TrendTracker();
 app.use(cors());
 app.use(express.json());
 
+// Simple usage tracking middleware
+const usageStats = {
+  totalRequests: 0,
+  endpointCounts: {},
+  dailyStats: {},
+  startTime: new Date(),
+};
+
+app.use((req, res, next) => {
+  usageStats.totalRequests++;
+
+  // Track endpoint usage
+  const endpoint = req.path;
+  usageStats.endpointCounts[endpoint] =
+    (usageStats.endpointCounts[endpoint] || 0) + 1;
+
+  // Track daily usage
+  const today = new Date().toISOString().split('T')[0];
+  if (!usageStats.dailyStats[today]) {
+    usageStats.dailyStats[today] = 0;
+  }
+  usageStats.dailyStats[today]++;
+
+  // Log API usage
+  console.log(
+    `📊 API Request: ${req.method} ${req.path} - Total: ${usageStats.totalRequests}`
+  );
+
+  next();
+});
+
 // Sample trends data (in a real app, this would come from a database)
 const sampleTrends = [
   {
@@ -44,6 +75,29 @@ const sampleTrends = [
 // Routes
 app.get('/', (req, res) => {
   res.json({ message: 'Trend Finder API is running!' });
+});
+
+// Usage statistics endpoint
+app.get('/api/stats', (req, res) => {
+  const uptime = Math.floor((Date.now() - usageStats.startTime) / 1000);
+
+  res.json({
+    success: true,
+    data: {
+      totalRequests: usageStats.totalRequests,
+      uptime: `${Math.floor(uptime / 3600)}h ${Math.floor(
+        (uptime % 3600) / 60
+      )}m ${uptime % 60}s`,
+      startTime: usageStats.startTime,
+      topEndpoints: Object.entries(usageStats.endpointCounts)
+        .sort(([, a], [, b]) => b - a)
+        .slice(0, 10)
+        .map(([endpoint, count]) => ({ endpoint, count })),
+      dailyStats: usageStats.dailyStats,
+      currentDate: new Date().toISOString(),
+    },
+    timestamp: new Date().toISOString(),
+  });
 });
 
 app.get('/api/trends', (req, res) => {
