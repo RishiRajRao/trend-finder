@@ -403,50 +403,103 @@
             <h2
               class="text-2xl font-bold text-gray-800 border-b-4 border-primary pb-2 mb-4"
             >
-              🔗 Cross-Matched Trending Topics
+              🔗 Matched Topics Across Sources
             </h2>
             <p class="text-gray-600 mb-6">
-              Topics appearing across multiple sources (highest priority)
+              Same or similar content found across multiple sources with
+              detailed source information
             </p>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div class="space-y-6">
               <div
                 v-for="(topic, index) in trendData.crossMatched.slice(0, 8)"
                 :key="index"
-                class="bg-gradient text-white p-6 rounded-lg shadow-lg"
+                class="bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden mb-6"
               >
-                <div class="flex justify-between items-center mb-4">
-                  <h3 class="text-lg font-semibold text-white">
-                    {{ topic.keyword }}
-                  </h3>
-                  <span
-                    class="bg-white bg-opacity-20 px-3 py-1 rounded-full text-sm font-bold"
-                  >
-                    Score: {{ topic.totalScore }}
-                  </span>
+                <div class="bg-gradient text-white p-4">
+                  <div class="flex justify-between items-start mb-2">
+                    <h3 class="text-xl font-bold text-white">
+                      {{ topic.keyword }}
+                    </h3>
+                    <span
+                      class="bg-white bg-opacity-20 px-3 py-1 rounded-full text-sm font-bold"
+                    >
+                      Score: {{ topic.totalScore }}
+                    </span>
+                  </div>
+                  <p class="text-white text-opacity-90 mb-3">
+                    {{ topic.description }}
+                  </p>
+                  <div class="flex items-center gap-2 text-sm">
+                    <span class="bg-white bg-opacity-20 px-2 py-1 rounded">
+                      {{ topic.matchType || 'similar' }} match
+                    </span>
+                    <span class="bg-white bg-opacity-20 px-2 py-1 rounded">
+                      {{ topic.matchedItemsCount || topic.sources.length }}
+                      items
+                    </span>
+                  </div>
                 </div>
-                <div class="flex gap-2 flex-wrap">
-                  <span
-                    v-for="source in topic.sources"
-                    :key="source.type"
-                    class="px-3 py-1 rounded-full text-xs font-bold"
-                    :class="{
-                      'bg-white bg-opacity-30': source.type === 'news',
-                      'bg-red-500 bg-opacity-30': source.type === 'youtube',
-                      'bg-green-600 bg-opacity-30': source.type === 'trends',
-                      'bg-blue-500 bg-opacity-30': source.type === 'twitter',
-                    }"
-                  >
-                    {{ source.type }}
-                  </span>
+
+                <div class="p-4">
+                  <h4 class="font-semibold text-gray-800 mb-3">
+                    Sources & Content:
+                  </h4>
+                  <div class="space-y-3">
+                    <div
+                      v-for="(source, sourceIndex) in topic.sources"
+                      :key="sourceIndex"
+                      class="border border-gray-100 rounded-lg p-3 hover:bg-gray-50 transition-colors"
+                    >
+                      <div class="flex justify-between items-start mb-2">
+                        <span
+                          class="px-2 py-1 rounded-full text-xs font-bold text-white"
+                          :class="{
+                            'bg-blue-500': source.type === 'news',
+                            'bg-red-500': source.type === 'youtube',
+                            'bg-green-500': source.type === 'google_trends',
+                            'bg-purple-500': source.type === 'twitter',
+                            'bg-orange-500': source.type === 'reddit',
+                          }"
+                        >
+                          {{ source.sourceLabel || source.type }}
+                        </span>
+                        <span class="text-xs text-gray-500 font-medium">
+                          Score: {{ source.data.score || 0 }}
+                        </span>
+                      </div>
+                      <p class="text-sm text-gray-700 font-medium mb-1">
+                        {{ source.data.title }}
+                      </p>
+                      <p
+                        class="text-xs text-gray-600"
+                        v-if="source.data.description"
+                      >
+                        {{ source.data.description.substring(0, 100) }}...
+                      </p>
+                      <div class="flex justify-between items-center mt-2">
+                        <span class="text-xs text-gray-500">
+                          {{ source.data.source || source.data.channelTitle }}
+                        </span>
+                        <a
+                          v-if="source.data.url"
+                          :href="source.data.url"
+                          target="_blank"
+                          class="text-primary text-xs font-bold hover:underline"
+                        >
+                          View Source →
+                        </a>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
           </div>
           <div v-else class="text-center py-16 text-gray-600">
             <h3 class="text-xl font-semibold text-gray-800 mb-4">
-              No cross-matched topics found
+              No matched topics found
             </h3>
-            <p>Topics need to appear in multiple sources to be cross-matched</p>
+            <p>Content needs to appear in multiple sources to be matched</p>
           </div>
         </div>
 
@@ -833,7 +886,7 @@ export default {
         { id: 'youtube', label: 'YouTube Videos', icon: '🎥' },
         { id: 'google', label: 'Google Trends', icon: '📈' },
         { id: 'reddit', label: 'Reddit Posts', icon: '🔴' },
-        { id: 'crossmatched', label: 'Cross-Matched', icon: '🔗' },
+        { id: 'crossmatched', label: 'Matched Topics', icon: '🔗' },
       ],
     };
   },

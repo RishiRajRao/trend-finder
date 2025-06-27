@@ -2646,32 +2646,34 @@ class TrendTracker {
         .map((item, index) => `${index + 1}. [${item.source}] "${item.title}"`)
         .join('\n');
 
-      const prompt = `You are an expert at identifying common themes and topics across different news and social media sources.
+      const prompt = `You are an expert at identifying matched topics and exact content matches across different news and social media sources.
 
-Analyze the following content from various sources and identify the TOP 3 COMMON THEMES that appear across MULTIPLE sources (News, YouTube, Twitter, Google Trends, Reddit).
+Analyze the following content from various sources and identify MATCHED TOPICS that represent the SAME or VERY SIMILAR content appearing across MULTIPLE sources (News, YouTube, Twitter, Google Trends, Reddit).
 
-Look for thematic connections like:
-- Same events described differently (e.g., "Israel-Iran conflict" and "Middle East crisis")  
-- Related topics (e.g., "Cricket match" and "India vs England")
-- Common personalities (e.g., "Modi announces" and "PM Modi")
-- Similar incidents (e.g., "Train accident" and "Railway mishap")
-- Trending subjects (e.g., "Bollywood wedding" and "Celebrity marriage")
+Look for exact matches or very similar content like:
+- Same news story reported differently (e.g., "PM Modi visits US" and "Modi's US trip")
+- Same events with different wording (e.g., "India vs Australia cricket" and "Ind-Aus match")
+- Same personalities mentioned (e.g., "Virat Kohli century" and "Kohli's hundred")
+- Same incidents (e.g., "Mumbai rain flooding" and "Heavy rains in Mumbai")
+- Same trending topics (e.g., "iPhone 15 launch" and "Apple iPhone 15 release")
 
 Content to analyze:
 ${contentList}
 
-For each common theme, provide:
-1. Theme name (concise, 2-4 words)
-2. Brief description 
-3. Which content items belong to this theme (use the numbers from the list)
+For each matched topic, provide:
+1. Topic name (concise, 2-4 words representing the matched content)
+2. Brief description of what the matched content is about
+3. Which content items are matches (use the numbers from the list)
+4. All source types that contain this match
 
-Return ONLY a JSON array with exactly 3 themes:
+Return ONLY a JSON array with up to 5 matched topics:
 [
   {
-    "theme": "Theme Name",
-    "description": "Brief description of the theme",
-    "items": [1, 5, 12, 18],
-    "sources": ["News", "YouTube", "Twitter"]
+    "topic": "Topic Name",
+    "description": "Brief description of the matched topic",
+    "matchedItems": [1, 5, 12, 18],
+    "sources": ["News", "YouTube", "Twitter"],
+    "matchType": "exact|similar|related"
   }
 ]`;
 
@@ -2681,7 +2683,7 @@ Return ONLY a JSON array with exactly 3 themes:
         apiKey: process.env.OPENAI_API_KEY,
       });
 
-      console.log('🤖 Analyzing common themes with OpenAI...');
+      console.log('🤖 Analyzing matched topics with OpenAI...');
 
       const completion = await openai.chat.completions.create({
         model: 'gpt-3.5-turbo',
@@ -2704,9 +2706,10 @@ Return ONLY a JSON array with exactly 3 themes:
       console.log('🎯 OpenAI Themes Response:', aiResponse);
 
       // Parse AI response
-      let themes;
+      let matchedTopics;
       try {
-        themes = JSON.parse(aiResponse);
+        matchedTopics = JSON.parse(aiResponse);
+        console.log('🎯 AI Matched Topics parsed:', matchedTopics);
       } catch (parseError) {
         console.log(
           '⚠️ AI response parsing failed, using manual cross-matching'
@@ -2720,17 +2723,17 @@ Return ONLY a JSON array with exactly 3 themes:
         );
       }
 
-      // Convert AI themes to our format
-      const crossMatchedTopics = themes.map((theme, index) => {
-        const relatedContent = [];
+      // Convert AI matched topics to our format
+      const crossMatchedTopics = matchedTopics.map((matchedTopic, index) => {
+        const matchedContent = [];
         let totalScore = 0;
 
-        theme.items.forEach((itemIndex) => {
+        matchedTopic.matchedItems.forEach((itemIndex) => {
           const adjustedIndex = itemIndex - 1; // Convert to 0-based
           if (adjustedIndex >= 0 && adjustedIndex < contentForAI.length) {
             const content = contentForAI[adjustedIndex];
 
-            // Find original data to get scores
+            // Find original data to get scores and full details
             let originalData = null;
             let score = 0;
 
@@ -2757,9 +2760,10 @@ Return ONLY a JSON array with exactly 3 themes:
             }
 
             if (originalData) {
-              relatedContent.push({
+              matchedContent.push({
                 type: content.type,
                 data: originalData,
+                sourceLabel: content.source,
               });
               totalScore += score;
             }
@@ -2767,19 +2771,21 @@ Return ONLY a JSON array with exactly 3 themes:
         });
 
         return {
-          keyword: theme.theme,
-          description: theme.description,
-          sources: relatedContent,
+          keyword: matchedTopic.topic,
+          description: matchedTopic.description,
+          matchType: matchedTopic.matchType || 'similar',
+          sources: matchedContent,
           totalScore: totalScore,
           aiGenerated: true,
-          sourceTypes: [...new Set(relatedContent.map((c) => c.type))],
+          sourceTypes: [...new Set(matchedContent.map((c) => c.type))],
+          matchedItemsCount: matchedContent.length,
         };
       });
 
       console.log(
-        `✅ AI identified ${crossMatchedTopics.length} common themes`
+        `✅ AI identified ${crossMatchedTopics.length} matched topics`
       );
-      return crossMatchedTopics.filter((topic) => topic.sources.length > 1); // Only multi-source themes
+      return crossMatchedTopics.filter((topic) => topic.sources.length > 1); // Only multi-source matches
     } catch (error) {
       console.error('❌ Error in AI cross-matching:', error.message);
       console.log('🔄 Falling back to manual cross-matching...');

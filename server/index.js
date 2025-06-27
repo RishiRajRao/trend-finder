@@ -264,10 +264,10 @@ app.get('/api/live-trends/reddit', async (req, res) => {
   }
 });
 
-// AI-powered cross-matched themes endpoint
+// AI-powered cross-matched topics endpoint
 app.get('/api/live-trends/themes', async (req, res) => {
   try {
-    console.log('🤖 Fetching AI-powered cross-matched themes...');
+    console.log('🤖 Fetching AI-powered matched topics...');
 
     // Fetch data from all sources
     const [
@@ -288,8 +288,8 @@ app.get('/api/live-trends/themes', async (req, res) => {
 
     const allNewsData = [...newsGNews, ...newsMediaStack];
 
-    // Get AI-powered cross-matched themes
-    const crossMatchedThemes = await trendTracker.crossMatchTopics(
+    // Get AI-powered matched topics
+    const matchedTopics = await trendTracker.crossMatchTopics(
       allNewsData,
       youtubeData,
       googleTrendsData,
@@ -299,12 +299,12 @@ app.get('/api/live-trends/themes', async (req, res) => {
 
     res.json({
       success: true,
-      data: crossMatchedThemes,
-      count: crossMatchedThemes.length,
+      data: matchedTopics,
+      count: matchedTopics.length,
       timestamp: new Date().toISOString(),
       meta: {
         method:
-          crossMatchedThemes.length > 0 && crossMatchedThemes[0].aiGenerated
+          matchedTopics.length > 0 && matchedTopics[0].aiGenerated
             ? 'OpenAI GPT-3.5-turbo'
             : 'Manual keyword matching',
         totalAnalyzed:
@@ -313,21 +313,21 @@ app.get('/api/live-trends/themes', async (req, res) => {
           googleTrendsData.length +
           twitterData.length +
           redditData.length,
-        themesFound: crossMatchedThemes.length,
+        topicsFound: matchedTopics.length,
         criteria: [
-          'Same events described differently',
-          'Related topics',
-          'Common personalities',
-          'Similar incidents',
-          'Trending subjects',
+          'Same news story reported differently',
+          'Same events with different wording',
+          'Same personalities mentioned',
+          'Same incidents',
+          'Same trending topics',
         ],
       },
     });
   } catch (error) {
-    console.error('Error fetching cross-matched themes:', error);
+    console.error('Error fetching matched topics:', error);
     res.status(500).json({
       success: false,
-      message: 'Failed to fetch cross-matched themes',
+      message: 'Failed to fetch matched topics',
       error: error.message,
     });
   }
@@ -413,9 +413,7 @@ app.listen(PORT, () => {
   console.log(`   GET /api/live-trends/youtube - YouTube trends only`);
   console.log(`   GET /api/live-trends/google - Google trends only`);
   console.log(`   GET /api/live-trends/reddit - Reddit trending posts only`);
-  console.log(
-    `   GET /api/live-trends/themes - 🤖 AI-powered cross-matched themes`
-  );
+  console.log(`   GET /api/live-trends/themes - 🤖 AI-powered matched topics`);
   console.log(
     `   GET /api/live-trends/viral - 🤖 AI-powered viral content sorting`
   );
