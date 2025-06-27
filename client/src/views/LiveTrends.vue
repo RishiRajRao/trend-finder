@@ -375,9 +375,9 @@
                     v-if="item.url"
                     :href="item.url"
                     target="_blank"
-                    class="bg-gradient-to-r from-purple-500 to-blue-500 text-white px-4 py-2 rounded-full text-sm font-bold hover:from-purple-600 hover:to-blue-600 transition-all duration-300"
+                    class="text-primary text-xs font-bold hover:underline"
                   >
-                    View →
+                    View Source →
                   </a>
                 </div>
               </div>
@@ -978,6 +978,14 @@ export default {
         return (num / 1000).toFixed(1) + 'K';
       }
       return num.toString();
+    },
+    extractDomain(url) {
+      try {
+        const urlObj = new URL(url);
+        return urlObj.hostname.replace('www.', '');
+      } catch (error) {
+        return 'Invalid URL';
+      }
     },
   },
   mounted() {
